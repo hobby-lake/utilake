@@ -1,8 +1,9 @@
 import { logger } from './utils';
-import { M_CYLINDER } from './actions/shape';
+import { M_DCYLINDER, M_CYLINDER } from './actions/shape';
 
 export function setupBarItems(): BarItem[] {
 
+    let make_dot_cylinder = M_DCYLINDER;
     let make_cylinder = M_CYLINDER;
 
     const actions: BarItem[] = [];
@@ -16,6 +17,6 @@ export function setupBarItems(): BarItem[] {
         }
     })
     
-    actions.push(test_action, make_cylinder);
+    actions.push(test_action, make_dot_cylinder, make_cylinder);
     return actions;
 }

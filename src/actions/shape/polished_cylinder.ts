@@ -1,9 +1,7 @@
 import {logger, Plane} from '../../utils'
 
-/// 固定内径の円上にCubeを配置する機能を実装
-/// 各Cubeのサイズは固定する
-export const M_DCYLINDER = new Action('make_dot_cylinder', {
-    name: 'ドット円を配置',
+export const M_CYLINDER = new Action('make_cylinder', {
+    name: '円を配置',
     icon: 'fa-star',
     click() {
         // ---- 目に見えない動作 ----
@@ -22,9 +20,9 @@ export const M_DCYLINDER = new Action('make_dot_cylinder', {
 // 入力が不適でも初期値を入れる。→ 例外処理面倒くさい
 function set_cube_like_sphere(text:string) {
     const raw_parameters = text.split('/');
-    let axis_plane:Plane = Plane.XY;
+    let axis_plane:Plane;
     let segment:number = 16;
-    let size_infrate:number = 0;
+    let size_infrate:number = 1;
     let inner_diameter:number = 1;
     let outer_diameter:number = 2;
 
@@ -38,7 +36,6 @@ function set_cube_like_sphere(text:string) {
         logger('[ERROR] Unsupported input')
         return
     }
-    
 
     raw_parameters.forEach(parameter => {
         if (parameter.includes('設置平面:')) {
@@ -80,52 +77,49 @@ function set_cube_like_sphere(text:string) {
 
     let cube_group:Cube[] = [];
 
-    // 外接円との接点座標
-    let outer_tangent_coordinates:[number, number, number][] = [];
-    for (let seg = 0; seg < segment; seg++) {
-        try {
-            let deg_theta = (360 / segment) * seg;
-            let rad_theta = Math.degToRad(deg_theta);
-            outer_tangent_coordinates.push([Math.cos(rad_theta)*outer_diameter, Math.sin(rad_theta)*outer_diameter, 0])
-            logger(`[CALC] OuterTangent - ${seg + 1} :${outer_tangent_coordinates[seg]}`)
-        } catch (error) {
-            logger(`[ERROR] at seg-${seg + 1}`)
-        }
-    }
-
     // Cubeの幅・高さ
     let cube_width: number = 2 * outer_diameter * Math.sin(Math.degToRad(180 / segment));
     let cube_height: number = (outer_diameter - inner_diameter) * Math.cos(Math.degToRad(180 / segment));
 
+    let master_vertice: [number, number, number] = [ 0, inner_diameter + ((outer_diameter - inner_diameter) / 2), 0 ];
+    let master_from: [number, number, number] = [ master_vertice[0] - (cube_width / 2), master_vertice[1] + (cube_height / 2), 0 ];
+    let master_to: [number, number, number] = [ master_vertice[0] + (cube_width / 2), master_vertice[1] - (cube_height / 2), 0 ];
+
     // 接点中心のCubeの作成と初期化
     Undo.initEdit({elements: []});
-    let cube_index = 0; // = segment index
-    outer_tangent_coordinates.forEach(coordinate => {
+    for (let cube_index = 0; cube_index < segment; cube_index++){
         // XY平面基準の頂点を導出
-        let raw_from: [number, number, number] = [ coordinate[0] - (cube_width / 2), coordinate[1] + (cube_height / 2), 0 ];
-        let raw_to: [number, number, number] = [ coordinate[0] + (cube_width / 2), coordinate[1] - (cube_height / 2), 0 ]
-
         let from: [number, number, number];
         let to: [number, number, number];
 
         let angle: [number, number, number] = [ 0, 0, 0 ];
 
+        //以下のts-ignoreはロジックとして例外があり得ないので使用
+        //@ts-ignore
         switch (axis_plane) {
             case Plane.XY:
-                from = raw_from;
-                to = raw_to;
+                from = master_from;
+                to = master_from;
+                angle = [360/segment*cube_index, 0, 0]
+                break;
             case Plane.XZ:
-                from = [raw_from[0], raw_from[2], raw_from[1]];
-                to = [raw_to[0], raw_to[2], raw_to[1]];
+                from = [master_from[0], master_from[2], master_from[1]];
+                to = [master_to[0], master_to[2], master_to[1]];
+                angle = [0, 0, 360/segment*cube_index]
+                break;
             case Plane.YZ:
-                from = [raw_from[2], raw_from[0], raw_from[1]];
-                to = [raw_to[2], raw_to[0], raw_to[1]];
+                from = [master_from[2], master_from[0], master_from[1]];
+                to = [master_to[2], master_to[0], master_to[1]];
+                angle = [0, 360/segment*cube_index, 0]
+                break;
         }
 
         cube_group.push(
             new Cube({
                 name: `seg_${cube_index + 1}`,
+                //@ts-ignore
                 from: from,
+                //@ts-ignore
                 to: to,
                 rotation: angle,
                 inflate: size_infrate,
@@ -136,8 +130,8 @@ function set_cube_like_sphere(text:string) {
                 
             }).init()
         )
-        logger(`[GEN] c_seg_${cube_index + 1} -> ${coordinate}`)
-        cube_index++;
-    });
-    Undo.finishEdit('make_dot_cylinder', {elements: cube_group})
+        logger(`[GEN] c_seg_${cube_index + 1}`)
+    };
+
+    Undo.finishEdit('make_cylinder', {elements: cube_group})
 }
